@@ -124,3 +124,63 @@ export async function generateGooglePost({
 
   return completion.choices[0]?.message?.content?.trim() ?? "";
 }
+
+/**
+ * Generuje propozycje SEO (tematy, tytuły, meta description, FAQ, linkowanie,
+ * aktualizacje, nowe landing page, klastry tematyczne, analiza luk vs konkurencja).
+ * WYŁĄCZNIE propozycje - nic z tego nie jest publikowane automatycznie.
+ */
+export async function generateSeoSuggestions(params: {
+  mode:
+    | "topics"
+    | "title"
+    | "meta_description"
+    | "faq"
+    | "internal_links"
+    | "content_update"
+    | "new_landing_page"
+    | "topic_cluster"
+    | "content_gap";
+  context: string; // np. istniejąca treść artykułu, lista obecnych podstron, tekst konkurencji
+}) {
+  const modeInstructions: Record<typeof params.mode, string> = {
+    topics: "Zaproponuj 5 nowych tematów artykułów blogowych o marketingu lokalnym i Google Maps, które jeszcze nie zostały poruszone.",
+    title: "Zaproponuj 3 warianty tytułu SEO (max 60 znaków) dla podanej treści.",
+    meta_description: "Zaproponuj 3 warianty meta description (max 155 znaków) dla podanej treści.",
+    faq: "Zaproponuj 5 pytań FAQ z odpowiedziami, które realnie mogliby zadać właściciele lokalnych firm na ten temat.",
+    internal_links: "Zaproponuj 5 miejsc, gdzie warto dodać link wewnętrzny do podanej treści, z krótkim uzasadnieniem.",
+    content_update: "Przeanalizuj podaną treść i zaproponuj konkretne aktualizacje - co jest nieaktualne, czego brakuje, co warto rozbudować.",
+    new_landing_page: "Na podstawie podanego kontekstu zaproponuj 3 nowe landing page (branża/usługa/miasto), które warto stworzyć.",
+    topic_cluster: "Zaproponuj nowy klaster tematyczny (grupę powiązanych artykułów wokół jednego tematu głównego) wraz z listą 5-8 podtematów.",
+    content_gap: "Porównaj podaną treść konkurencji z tym co już mamy i wskaż konkretne luki tematyczne, które warto uzupełnić.",
+  };
+
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    temperature: 0.6,
+    max_tokens: 1200,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Jesteś ekspertem SEO (technical, content, programmatic) dla polskiego startupu SaaS z branży marketingu lokalnego. " +
+          "Odpowiadasz WYŁĄCZNIE w formacie JSON: " +
+          '{"suggestions": [{"title": "...", "detail": "...", "reasoning": "..."}]}. ' +
+          "Bez treści poza tym obiektem JSON. Pisz po polsku, konkretnie, bez lania wody.",
+      },
+      {
+        role: "user",
+        content: `${modeInstructions[params.mode]}\n\nKontekst:\n${params.context}`,
+      },
+    ],
+  });
+
+  const raw = completion.choices[0]?.message?.content?.trim() ?? '{"suggestions":[]}';
+  try {
+    return JSON.parse(raw) as {
+      suggestions: { title: string; detail: string; reasoning: string }[];
+    };
+  } catch {
+    return { suggestions: [] };
+  }
+}
