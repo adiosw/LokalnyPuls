@@ -89,6 +89,7 @@ przeciągnij całą zawartość folderu `lokalny-puls/`.
 2. W **Environment Variables** wklej wszystkie zmienne z `.env.local.example`,
    wypełnione prawdziwymi wartościami z Kroków 2-5, plus:
    - `CRON_SECRET` — losowy ciąg (np. `openssl rand -hex 32`)
+   - `ADMIN_EMAIL` — Twój email logowania (odblokowuje dostęp do `/admin/seo`)
    - `NEXT_PUBLIC_APP_URL` = `https://lokalnypuls.pl` (bez subdomeny `app.`!)
 3. **Deploy** — Vercel wykryje `vercel.json` i skonfiguruje crony automatycznie
 4. **Project Settings → Domains** → dodaj `lokalnypuls.pl` (i `www.lokalnypuls.pl`
@@ -130,3 +131,74 @@ szukaj po prostu przez Ctrl+F tej samej treści co wcześniej, tylko w innym pli
 | Płatności subskrypcyjne (Stripe) | Chatbot, WhatsApp, Voice AI, rezerwacje (v2.0) |
 | Cotygodniowy email + streak (Resend) | |
 | Codzienne AI Insights (cron) | |
+
+---
+
+# MODUŁ SEO (dodany w Etapie SEO)
+
+## 1. Strony miasto + branża (programmatic SEO)
+
+```
+/{branża}-{miasto}-{google-maps|google-opinie|google-business}
+```
+
+Przykłady już działające: `/mechanik-oswiecim-google-maps`, `/fryzjer-krakow-google-maps`,
+`/stomatolog-poznan-google-business`.
+
+**Dane źródłowe** (edytuj, żeby rozbudować system):
+- `lib/seo/cities.ts` — obecnie 10 miast
+- `lib/seo/industries.ts` — obecnie 10 branż, każda z WŁASNYMI pain points/benefitami/FAQ
+  (celowo nie jeden uniwersalny szablon z podmienioną nazwą - to zapobiega thin content)
+
+**10 miast × 10 branż = 100 stron z jednego szablonu** (`app/[slug]/page.tsx`).
+Dopisanie jednego miasta w `cities.ts` = automatycznie +10 nowych stron, bez zmiany kodu.
+
+Każda strona ma: unikalny title/meta/H1/hero (wariant wybierany deterministycznie
+z hasha slugu — nie losowo, więc build jest powtarzalny), pain points i benefity
+specyficzne dla branży, FAQ z podstawioną odmianą nazwy miasta, Schema.org
+(Service + FAQPage + BreadcrumbList), canonical, linkowanie wewnętrzne do
+2-3 powiązanych stron (ta sama branża w innym mieście + to samo miasto w innej branży).
+
+**Skalowanie do tysięcy stron:** obecnie wszystkie 100 stron są pre-renderowane
+na buildzie (SSG). Przy kilkuset+ miastach warto przełączyć w `app/[slug]/page.tsx`
+na `dynamicParams = true` + `export const revalidate = 86400` (ISR) — reszta kodu
+zostaje bez zmian.
+
+## 2. Strony usług
+
+```
+/uslugi              → lista wszystkich 11 usług
+/uslugi/{usluga}     → np. /uslugi/optymalizacja-wizytowki-google
+```
+
+Dane w `lib/seo/services.ts`. Każda strona ma własny title/meta/H1, sekcję
+korzyści, FAQ, Schema.org (Service + FAQPage), linkowanie do 3 przykładowych
+stron miasto+branża oraz do pozostałych usług.
+
+## 3. Sitemap i robots.txt
+
+`app/sitemap.ts` generuje automatycznie `/sitemap.xml` ze wszystkich stron
+(statyczne + 100 programmatic + 11 usług = 115 URLi obecnie). `app/robots.ts`
+blokuje indeksowanie `/dashboard`, `/admin`, `/api`, `/login`, `/register`.
+
+Jeden plik sitemap wystarcza do ok. 50 000 adresów (limit Google) — przy
+realnym skalowaniu do tysięcy stron nadal mieści się z zapasem w jednym pliku.
+
+## 4. AI Asystent SEO — `/admin/seo`
+
+Narzędzie WEWNĘTRZNE, tylko dla Ciebie — nie jest częścią dashboardu klienta
+i klienci SaaS nie mają do niego dostępu (chronione przez `ADMIN_EMAIL`).
+
+Generuje propozycje: nowe tematy artykułów, warianty title/meta description,
+FAQ, linkowanie wewnętrzne, aktualizacje starych treści, nowe landing page,
+klastry tematyczne, analiza luk względem konkurencji.
+
+**Nic nie publikuje się automatycznie.** Każda propozycja trafia do tabeli
+`seo_suggestions` ze statusem `pending` i czeka na Twoją decyzję (przycisk
+Zatwierdź/Odrzuć w `/admin/seo`) — zatwierdzenie oznacza tylko "przejrzane",
+nie tworzy ani nie zmienia żadnej realnej strony. Wdrożenie zatwierdzonej
+sugestii (np. dodanie nowego miasta do `cities.ts`) pozostaje ręcznym krokiem.
+
+**Dostęp:** zaloguj się na konto z emailem ustawionym w `ADMIN_EMAIL`, wejdź
+na `lokalnypuls.pl/admin/seo`. Każdy inny zalogowany użytkownik jest
+przekierowywany z powrotem do `/dashboard`.
