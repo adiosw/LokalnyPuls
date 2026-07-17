@@ -32,8 +32,10 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Chronimy wszystko pod /dashboard - brak sesji = redirect do /login
-  if (!user && request.nextUrl.pathname.startsWith("/dashboard")) {
+  // Chronimy /dashboard i /admin - brak sesji = redirect do /login
+  // (dokładne sprawdzenie czy to admin, a nie zwykły klient, dzieje się
+  // dodatkowo w samej stronie /admin/seo przez lib/admin-auth.ts)
+  if (!user && (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/admin"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
