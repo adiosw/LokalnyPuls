@@ -101,6 +101,20 @@ create table if not exists monthly_goals (
   created_at timestamp with time zone default now()
 );
 
+-- Sugestie AI SEO (moduł wewnętrzny - NIE dla klientów, tylko dla właściciela Lokalny Puls)
+-- Wszystko tutaj to WYŁĄCZNIE propozycje do ręcznej akceptacji - żaden wiersz
+-- z tej tabeli nie tworzy ani nie publikuje automatycznie żadnej strony/treści.
+create table if not exists seo_suggestions (
+  id uuid primary key default gen_random_uuid(),
+  type text not null, -- topic | title | meta_description | faq | internal_links | content_update | new_landing_page | topic_cluster | content_gap
+  target_url text, -- np. '/mechanik-oswiecim-google-maps' - czego dotyczy sugestia (może być puste dla nowych propozycji)
+  suggestion jsonb not null, -- treść propozycji (struktura zależna od `type`)
+  reasoning text, -- dlaczego AI to proponuje
+  status text default 'pending', -- pending | approved | rejected
+  created_at timestamp with time zone default now(),
+  reviewed_at timestamp with time zone
+);
+
 -- ============================================================
 -- ROW LEVEL SECURITY - każdy klient widzi TYLKO swoje dane
 -- ============================================================
@@ -150,6 +164,12 @@ create policy "Właściciel widzi powiadomienia swojej firmy"
 
 alter table ai_insights enable row level security;
 alter table monthly_goals enable row level security;
+
+-- RLS włączone, ale CELOWO bez żadnych polityk dla anon/authenticated -
+-- to blokuje wszystkim zwykłym użytkownikom (w tym Twoim klientom SaaS)
+-- jakikolwiek dostęp. Jedyny sposób odczytu/zapisu to service_role z API
+-- /api/admin/seo-assistant, który sam sprawdza czy to Ty się logujesz.
+alter table seo_suggestions enable row level security;
 
 create policy "Właściciel widzi insighty swojej firmy"
   on ai_insights for select
