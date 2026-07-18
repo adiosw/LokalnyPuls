@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { stripe, PLAN_PRICE_IDS } from "@/lib/stripe";
+import { getStripe, PLAN_PRICE_IDS } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   const { planId } = (await req.json()) as {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Nieznany plan" }, { status: 400 });
   }
 
-  const session = await stripe.checkout.sessions.create({
+  const session = await getStripe().checkout.sessions.create({
     mode: "subscription",
     customer_email: business.stripe_customer_id ? undefined : user.email,
     customer: business.stripe_customer_id ?? undefined,
