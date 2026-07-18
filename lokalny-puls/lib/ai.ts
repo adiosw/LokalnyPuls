@@ -1,6 +1,23 @@
 import Groq from "groq-sdk";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
+let groqInstance: Groq | null = null;
+
+/**
+ * Leniwa inicjalizacja - patrz komentarz w lib/stripe.ts. Ten sam problem
+ * dotyczył Groq: brak GROQ_API_KEY wywalał budowanie CAŁEJ aplikacji,
+ * nie tylko funkcji, które go używają.
+ */
+function getGroq(): Groq {
+  if (!groqInstance) {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error(
+        "Brak GROQ_API_KEY w zmiennych środowiskowych. Ustaw go w Vercel: Project Settings -> Environment Variables."
+      );
+    }
+    groqInstance = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return groqInstance;
+}
 
 /**
  * Generuje sugerowaną odpowiedź na opinię Google po polsku.
@@ -22,7 +39,7 @@ export async function generateReviewReply({
       ? "rzeczowy, dziękujący za feedback, delikatnie zachęcający do powrotu"
       : "entuzjastyczny, ciepły, krótko dziękujący";
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     temperature: 0.6,
     max_tokens: 300,
@@ -54,7 +71,7 @@ export async function generateDailyInsights(context: {
   photosCount: number;
   daysSinceLastPost: number | null;
 }) {
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     temperature: 0.5,
     max_tokens: 350,
@@ -105,7 +122,7 @@ export async function generateGooglePost({
   industry: string;
   topic: string;
 }) {
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     temperature: 0.7,
     max_tokens: 250,
@@ -155,7 +172,7 @@ export async function generateSeoSuggestions(params: {
     content_gap: "Porównaj podaną treść konkurencji z tym co już mamy i wskaż konkretne luki tematyczne, które warto uzupełnić.",
   };
 
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: "llama-3.3-70b-versatile",
     temperature: 0.6,
     max_tokens: 1200,

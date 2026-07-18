@@ -1,6 +1,23 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let resendInstance: Resend | null = null;
+
+/**
+ * Leniwa inicjalizacja - patrz komentarz w lib/stripe.ts. Ten sam problem
+ * dotyczył Resend: `new Resend(undefined)` rzuca wyjątkiem na starcie modułu
+ * i wywala cały build, jeśli RESEND_API_KEY nie jest ustawiony.
+ */
+function getResend(): Resend {
+  if (!resendInstance) {
+    if (!process.env.RESEND_API_KEY) {
+      throw new Error(
+        "Brak RESEND_API_KEY w zmiennych środowiskowych. Ustaw go w Vercel: Project Settings -> Environment Variables."
+      );
+    }
+    resendInstance = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendInstance;
+}
 
 /**
  * Wysyła cotygodniowe podsumowanie firmy - główny mechanizm retencji
@@ -30,7 +47,7 @@ export async function sendWeeklySummaryEmail({
       ? `📉 ${ratingChange.toFixed(1)}`
       : "bez zmian";
 
-  await resend.emails.send({
+  await getResend().emails.send({
     from: "Lokalny Puls <raporty@lokalnypuls.pl>",
     to,
     subject: `Twój tydzień: ${businessName} (${newReviews} nowych opinii)`,
